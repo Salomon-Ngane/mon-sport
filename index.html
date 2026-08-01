@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mon Sport — Serge</title>
+<meta name="theme-color" content="#c1502e">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="banner" class="banner"></div>
+
+<header class="app-header">
+  <div class="app-header-title">Mon <span>Sport</span></div>
+  <div class="water-widget">
+    <span id="waterCountdown">—</span>
+  </div>
+</header>
+
+<main class="app-main">
+
+  <!-- ACCUEIL -->
+  <section id="view-home" class="view">
+    <div class="hero-card">
+      <div class="hero-label">Aujourd'hui</div>
+      <div class="hero-title" id="todayTitle">—</div>
+      <div class="hero-meta" id="todayMeta"></div>
+      <div class="hero-status" id="todayStatus"></div>
+      <button class="cta" id="goToTodayBtn">Voir la séance du jour</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="streakCount">0</div>
+        <div class="stat-label">jours de suite</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="weekCount">0</div>
+        <div class="stat-label">séances cette semaine</div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-row">
+        <span>Rappel d'hydratation</span>
+        <select id="waterIntervalSelect">
+          <option value="60">Toutes les heures</option>
+          <option value="120">Toutes les 2 heures</option>
+          <option value="180">Toutes les 3 heures</option>
+        </select>
+      </div>
+      <button class="cta secondary" id="enableNotifBtn">🔔 Activer les notifications</button>
+      <p class="fine-print">Les rappels fonctionnent tant que l'app reste ouverte ou en arrière-plan. Pour une alarme garantie même app fermée, utilise en complément l'app Horloge de ton téléphone.</p>
+    </div>
+  </section>
+
+  <!-- PROGRAMME -->
+  <section id="view-program" class="view">
+    <h2 class="section-title">Mon programme</h2>
+    <div class="day-card-grid" id="programList"></div>
+    <div id="programDetail" style="display:none;"></div>
+  </section>
+
+  <!-- SEANCE -->
+  <section id="view-session" class="view"></section>
+
+  <!-- JOURNAL -->
+  <section id="view-journal" class="view">
+    <h2 class="section-title">Journal des séances</h2>
+    <div id="journalList"></div>
+  </section>
+
+  <!-- NUTRITION -->
+  <section id="view-nutrition" class="view">
+    <h2 class="section-title">Nutrition</h2>
+    <div class="card">
+      <h3>Principes de base</h3>
+      <ul id="nutriPrincipes"></ul>
+    </div>
+    <div class="card">
+      <h3>Journée type</h3>
+      <div id="nutriJournee"></div>
+    </div>
+    <div class="card">
+      <h3>Aliments clés</h3>
+      <div id="nutriAliments"></div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tab-bar">
+  <button class="tab active" data-view="home">🏠<span>Accueil</span></button>
+  <button class="tab" data-view="program">📋<span>Programme</span></button>
+  <button class="tab" data-view="journal">📈<span>Journal</span></button>
+  <button class="tab" data-view="nutrition">🍽️<span>Nutrition</span></button>
+</nav>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

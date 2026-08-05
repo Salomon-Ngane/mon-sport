@@ -1,426 +1,252 @@
-/* ============ STORAGE ============ */
-const store = {
-  get(key, fallback) {
-    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
-    catch { return fallback; }
-  },
-  set(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
-};
+// --- Configuration & Éléments du DOM ---
+const EXERCISES = [
+    { name: "Jumping Jacks", duration: 40, image: "mon-sport/jumping-jacks.jpg" },
+    { name: "Squats", duration: 45, image: "mon-sport/squats.jpg" },
+    { name: "Pompes", duration: 30, image: "mon-sport/pompes.jpg" },
+    { name: "Fentes alternées", duration: 45, image: "mon-sport/fentes.jpg" },
+    { name: "Gainage", duration: 60, image: "mon-sport/gainage.jpg" }
+];
 
-const state = {
-  sessions: store.get("sessions", []),
-  settings: store.get("settings", { waterIntervalMin: 120 }),
-  waterNext: store.get("waterNext", null),
-};
+const REST_DURATION = 20; // Repos entre exercices en secondes
 
-/* ============ SON / VIBRATION ============ */
+let currentExerciseIndex = 0;
+let timer = null;
+let timeLeft = 0;
+let isPaused = false;
+let isResting = false;
+
+let wakeLock = null;
 let audioCtx = null;
-function beep(freq = 880, duration = 150) {
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.frequency.value = freq;
-    o.connect(g); g.connect(audioCtx.destination);
-    g.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    o.start();
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration / 1000);
-    o.stop(audioCtx.currentTime + duration / 1000);
-  } catch (e) { /* silence si non supporté */ }
-  if (navigator.vibrate) navigator.vibrate(80);
-}
 
-/* ============ NOTIFICATIONS ============ */
-function askNotifPermission() {
-  if ("Notification" in window && Notification.permission === "default") {
-    Notification.requestPermission();
-  }
-}
-function notify(title, body) {
-  if ("Notification" in window && Notification.permission === "granted") {
-    try {
-      navigator.serviceWorker?.getRegistration().then((reg) => {
-        if (reg) reg.showNotification(title, { body, icon: "icon-192.png" });
-        else new Notification(title, { body });
-      });
-    } catch { new Notification(title, { body }); }
-  }
-  showBanner(`${title} — ${body}`);
-}
+// Éléments HTML
+const setupCard = document.getElementById('setup-card');
+const exerciseCard = document.getElementById('exercise-card');
+const restCard = document.getElementById('rest-card');
+const startBtn = document.getElementById('start-btn');
+const pauseBtn = document.getElementById('pause-btn');
+const skipBtn = document.getElementById('skip-btn');
+const exerciseNameEl = document.getElementById('exercise-name');
+const exerciseStepEl = document.getElementById('exercise-step');
+const exerciseImageEl = document.getElementById('exercise-image');
+const timerSecondsEl = document.getElementById('timer-seconds');
+const restSecondsEl = document.getElementById('rest-seconds');
+const streakCountEl = document.getElementById('streak-count');
 
-function showBanner(text) {
-  const b = document.getElementById("banner");
-  b.textContent = text;
-  b.classList.add("show");
-  clearTimeout(b._t);
-  b._t = setTimeout(() => b.classList.remove("show"), 5000);
-}
-
-/* ============ RAPPEL HYDRATATION (toutes les X min) ============ */
-function scheduleWater() {
-  const intervalMs = state.settings.waterIntervalMin * 60 * 1000;
-  const now = Date.now();
-  if (!state.waterNext || state.waterNext < now - intervalMs) {
-    state.waterNext = now + intervalMs;
-    store.set("waterNext", state.waterNext);
-  }
-  checkWaterLoop();
-}
-function checkWaterLoop() {
-  setInterval(() => {
-    if (Date.now() >= state.waterNext) {
-      notify("💧 Hydratation", "C'est l'heure de boire de l'eau.");
-      state.waterNext = Date.now() + state.settings.waterIntervalMin * 60 * 1000;
-      store.set("waterNext", state.waterNext);
-      renderWaterCountdown();
+// --- 1. Gestion Robuste de l'AudioContext (Bypass Autoplay Policy) ---
+function initAudio() {
+    if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+        }
     }
-  }, 15000);
-  renderWaterCountdown();
-  setInterval(renderWaterCountdown, 15000);
-}
-function renderWaterCountdown() {
-  const el = document.getElementById("waterCountdown");
-  if (!el || !state.waterNext) return;
-  const diff = Math.max(0, state.waterNext - Date.now());
-  const m = Math.floor(diff / 60000);
-  el.textContent = `prochain rappel dans ${m} min`;
-}
-function mixtureReminder() {
-  notify("🥤 Mixture", "Séance terminée — pense à prendre ta préparation nutritionnelle.");
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
 }
 
-/* ============ NAVIGATION ============ */
-const views = ["home", "program", "session", "journal", "nutrition"];
-function showView(id) {
-  views.forEach((v) => document.getElementById("view-" + v).classList.toggle("active", v === id));
-  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === id));
-  window.scrollTo(0, 0);
+function beep(freq = 440, type = 'sine', duration = 0.15) {
+    if (!audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+        osc.stop(audioCtx.currentTime + duration);
+    } catch (e) {
+        console.warn("Erreur d'émission sonore :", e);
+    }
 }
-document.querySelectorAll(".tab").forEach((t) => {
-  t.addEventListener("click", () => showView(t.dataset.view));
+
+// --- 2. Gestion Sécurisée et Continue du Wake Lock ---
+async function requestWakeLock() {
+    if ('wakeLock' in navigator && !wakeLock) {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+                wakeLock = null;
+            });
+        } catch (err) {
+            console.warn(`Erreur Wake Lock: ${err.name}, ${err.message}`);
+        }
+    }
+}
+
+// Réactivation automatique du Wake Lock lors du retour sur l'application
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && exerciseCard.classList.contains('active')) {
+        await requestWakeLock();
+    }
 });
 
-/* ============ ACCUEIL ============ */
-function todayDay() {
-  const idx = new Date().getDay(); // 0=dim..6=sam
-  const order = [6, 0, 1, 2, 3, 4, 5]; // lundi=j1 ... dimanche=j7
-  return PROGRAM.days[order[idx]];
-}
-function renderHome() {
-  const day = todayDay();
-  document.getElementById("todayTitle").textContent = day.title;
-  document.getElementById("todayMeta").textContent =
-    day.type === "circuit" ? day.circuitInfo :
-    day.type === "emom" ? day.emomInfo :
-    day.type === "rest" ? "Journée de récupération" : "Séance en séries";
-
-  const doneToday = state.sessions.some(s => s.date === new Date().toDateString() && s.dayId === day.id);
-  document.getElementById("todayStatus").textContent = doneToday ? "✅ Séance déjà enregistrée aujourd'hui" : "";
-
-  document.getElementById("streakCount").textContent = computeStreak();
-  document.getElementById("weekCount").textContent = sessionsThisWeek();
-
-  document.getElementById("goToTodayBtn").onclick = () => openDay(day.id);
-}
+// --- 3. Calcul de Régularité (Streak) Assoupli (Fenêtre de 48h) ---
 function computeStreak() {
-  let streak = 0;
-  let d = new Date();
-  const dates = new Set(state.sessions.map(s => s.date));
-  while (dates.has(d.toDateString())) {
-    streak++;
-    d.setDate(d.getDate() - 1);
-  }
-  return streak;
-}
-function sessionsThisWeek() {
-  const now = new Date();
-  const start = new Date(now); start.setDate(now.getDate() - now.getDay());
-  return state.sessions.filter(s => new Date(s.date) >= start).length;
-}
+    const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
+    if (history.length === 0) return 0;
 
-/* ============ PROGRAMME (liste + détail) ============ */
-function renderProgramList() {
-  const el = document.getElementById("programList");
-  el.innerHTML = "";
-  PROGRAM.days.forEach((day) => {
-    const card = document.createElement("div");
-    card.className = "day-card";
-    card.innerHTML = `<div class="day-card-title">${day.title}</div>
-      <div class="day-card-sub">${day.type === "rest" ? "Récupération" : (day.exercises.length || day.cycle.length) + " exercices"}</div>`;
-    card.onclick = () => openDay(day.id);
-    el.appendChild(card);
-  });
-}
+    // Dates triées par ordre décroissant (plus récente en premier)
+    const uniqueDates = [...new Set(history)].map(d => new Date(d)).sort((a, b) => b - a);
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    let streak = 0;
+    let lastDate = today;
 
-function openDay(dayId) {
-  const day = PROGRAM.days.find(d => d.id === dayId);
-  currentDay = day;
-  const el = document.getElementById("programDetail");
-  const list = document.getElementById("programList");
-  list.style.display = "none";
-  el.style.display = "block";
-  el.innerHTML = `
-    <button class="back-btn" id="backToList">← Retour</button>
-    <h2>${day.title}</h2>
-    <p class="muted">${day.circuitInfo || day.emomInfo || (day.type === "sets" ? "3 séries par exercice, ~60 sec repos entre séries" : "")}</p>
-    <div class="exo-grid" id="exoGrid"></div>
-    ${day.type !== "rest" ? `<button class="cta" id="startSessionBtn">▶ Démarrer la séance</button>` : `<button class="cta" id="startSessionBtn">✓ Marquer comme fait</button>`}
-  `;
-  const grid = document.getElementById("exoGrid");
-  const list_ex = day.exercises || day.cycle;
-  list_ex.forEach((ex) => {
-    const card = document.createElement("div");
-    card.className = "exo-card";
-    card.innerHTML = `
-      <div class="exo-img">${pose(ex.pose)}</div>
-      <div class="exo-info">
-        <div class="exo-name">${ex.name}</div>
-        <div class="exo-meta">${ex.masse !== "—" ? "Masse : " + ex.masse + " · " : ""}${ex.detail}</div>
-      </div>`;
-    grid.appendChild(card);
-  });
-  document.getElementById("backToList").onclick = () => { el.style.display = "none"; list.style.display = "grid"; };
-  document.getElementById("startSessionBtn").onclick = () => startSession(day);
-  showView("program");
-}
+    for (let i = 0; i < uniqueDates.length; i++) {
+        const currentDate = new Date(uniqueDates[i].getFullYear(), uniqueDates[i].getMonth(), uniqueDates[i].getDate());
+        const diffInDays = Math.round((lastDate - currentDate) / (1000 * 60 * 60 * 24));
 
-/* ============ SEANCE / TIMER ============ */
-let currentDay = null;
-let sessionTimer = { steps: [], index: 0, remaining: 0, running: false, startedAt: null, wakeLock: null };
+        if (i === 0 && diffInDays > 1) {
+            // Plus de 48h écoulées depuis le dernier entraînement : Série rompue
+            break;
+        }
 
-function buildSteps(day) {
-  const steps = [];
-  if (day.type === "circuit") {
-    for (let r = 0; r < day.rounds; r++) {
-      day.exercises.forEach((ex, i) => {
-        steps.push({ kind: "work", label: ex.name, sub: ex.masse !== "—" ? "Masse : " + ex.masse : "", duration: day.work, pose: ex.pose });
-        if (i < day.exercises.length - 1) steps.push({ kind: "rest", label: "Repos", duration: day.rest });
-      });
-      if (r < day.rounds - 1) steps.push({ kind: "roundrest", label: `Repos entre tours (tour ${r + 1}/${day.rounds} terminé)`, duration: day.roundRest });
+        if (diffInDays <= 1) {
+            streak++;
+            lastDate = currentDate;
+        } else {
+            break; // Interruption dans la régularité
+        }
     }
-  } else if (day.type === "emom") {
-    for (let c = 0; c < day.repeats; c++) {
-      day.cycle.forEach((ex) => {
-        steps.push({ kind: "work", label: ex.name, sub: `${ex.detail}${ex.masse !== "—" ? " · " + ex.masse : ""}`, duration: 60, pose: ex.pose });
-      });
-    }
-  }
-  return steps;
+    
+    return streak;
 }
 
-function startSession(day) {
-  if (day.type === "rest") {
-    logSession(day, 0, "Journée de repos actif");
-    showBanner("Journée de repos enregistrée. Bonne récupération 🌿");
-    return;
-  }
-  currentDay = day;
-  sessionTimer.startedAt = Date.now();
-
-  const el = document.getElementById("view-session");
-  if (day.type === "sets") {
-    renderSetsSession(day, el);
-  } else {
-    sessionTimer.steps = buildSteps(day);
-    sessionTimer.index = 0;
-    renderTimerSession(day, el);
-    runStep();
-  }
-  requestWakeLock();
-  showView("session");
+function updateStreakDisplay() {
+    streakCountEl.textContent = computeStreak();
 }
 
-async function requestWakeLock() {
-  try {
-    if ("wakeLock" in navigator) sessionTimer.wakeLock = await navigator.wakeLock.request("screen");
-  } catch (e) { /* pas supporté, tant pis */ }
-}
-function releaseWakeLock() {
-  if (sessionTimer.wakeLock) { sessionTimer.wakeLock.release().catch(()=>{}); sessionTimer.wakeLock = null; }
+function saveWorkoutCompletion() {
+    const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
+    history.push(new Date().toISOString());
+    localStorage.setItem('workout_history', JSON.stringify(history));
+    updateStreakDisplay();
 }
 
-function renderTimerSession(day, el) {
-  el.innerHTML = `
-    <div class="session-header">
-      <button class="back-btn" id="stopSessionBtn">✕ Arrêter</button>
-      <div class="session-title">${day.title}</div>
-    </div>
-    <div class="timer-box" id="timerBox">
-      <div class="timer-img" id="timerImg"></div>
-      <div class="timer-label" id="timerLabel">—</div>
-      <div class="timer-sub" id="timerSub"></div>
-      <div class="timer-clock" id="timerClock">--</div>
-      <div class="timer-progress"><div class="timer-progress-bar" id="timerBar"></div></div>
-      <button class="cta secondary" id="skipStepBtn">Passer ⏭</button>
-    </div>`;
-  document.getElementById("stopSessionBtn").onclick = () => endSession(true);
-  document.getElementById("skipStepBtn").onclick = () => nextStep(true);
+// --- 4. Moteur de la Séance d'Entraînement ---
+function startWorkout() {
+    initAudio();
+    requestWakeLock();
+    
+    currentExerciseIndex = 0;
+    setupCard.classList.add('hidden');
+    exerciseCard.classList.remove('hidden');
+    exerciseCard.classList.add('active');
+    
+    runExercise();
 }
 
-let stepInterval = null;
-function runStep() {
-  clearInterval(stepInterval);
-  const step = sessionTimer.steps[sessionTimer.index];
-  if (!step) { endSession(false); return; }
-
-  document.getElementById("timerLabel").textContent = step.label;
-  document.getElementById("timerSub").textContent = step.sub || (step.kind === "rest" || step.kind === "roundrest" ? "Récupère..." : "");
-  document.getElementById("timerImg").innerHTML = step.pose ? pose(step.pose) : "";
-  document.getElementById("timerImg").style.display = step.pose ? "block" : "none";
-  document.getElementById("timerBox")?.classList.toggle("resting", step.kind !== "work");
-
-  let remaining = step.duration;
-  updateClock(remaining, step.duration);
-  beep(step.kind === "work" ? 660 : 990, 120);
-
-  stepInterval = setInterval(() => {
-    remaining--;
-    updateClock(remaining, step.duration);
-    if (remaining <= 3 && remaining > 0) beep(500, 90);
-    if (remaining <= 0) {
-      clearInterval(stepInterval);
-      nextStep(false);
-    }
-  }, 1000);
-}
-function updateClock(remaining, total) {
-  document.getElementById("timerClock").textContent = remaining;
-  document.getElementById("timerBar").style.width = `${100 - (remaining / total) * 100}%`;
-}
-function nextStep(manual) {
-  clearInterval(stepInterval);
-  sessionTimer.index++;
-  if (sessionTimer.index >= sessionTimer.steps.length) { endSession(false); return; }
-  runStep();
-}
-
-function renderSetsSession(day, el) {
-  const progress = day.exercises.map(() => 0);
-  el.innerHTML = `
-    <div class="session-header">
-      <button class="back-btn" id="stopSessionBtn">✕ Arrêter</button>
-      <div class="session-title">${day.title}</div>
-    </div>
-    <div class="sets-list" id="setsList"></div>
-    <button class="cta" id="finishSetsBtn">✓ Terminer la séance</button>`;
-  document.getElementById("stopSessionBtn").onclick = () => endSession(true);
-  document.getElementById("finishSetsBtn").onclick = () => endSession(false);
-
-  const list = document.getElementById("setsList");
-  day.exercises.forEach((ex, i) => {
-    const target = (ex.detail.match(/^(\d+)/) || [, "3"])[1];
-    const card = document.createElement("div");
-    card.className = "exo-card set-card";
-    card.innerHTML = `
-      <div class="exo-img">${pose(ex.pose)}</div>
-      <div class="exo-info">
-        <div class="exo-name">${ex.name}</div>
-        <div class="exo-meta">${ex.masse !== "—" ? "Masse : " + ex.masse + " · " : ""}${ex.detail}</div>
-        <div class="set-controls">
-          <button class="mini-btn minus">−</button>
-          <span class="set-count" id="count-${i}">0 / ${target}</span>
-          <button class="mini-btn plus">+</button>
-        </div>
-      </div>`;
-    const countEl = () => card.querySelector(`#count-${i}`);
-    card.querySelector(".plus").onclick = () => {
-      progress[i] = Math.min(Number(target) + 5, progress[i] + 1);
-      countEl().textContent = `${progress[i]} / ${target}`;
-      beep(700, 100);
+function runExercise() {
+    isResting = false;
+    const current = EXERCISES[currentExerciseIndex];
+    
+    exerciseStepEl.textContent = `Exercice ${currentExerciseIndex + 1}/${EXERCISES.length}`;
+    exerciseNameEl.textContent = current.name;
+    
+    // Chargement de l'image correspondante depuis le dossier mon-sport
+    exerciseImageEl.src = current.image;
+    exerciseImageEl.onerror = () => {
+        // Image de secours si la photo n'est pas trouvée
+        exerciseImageEl.src = 'mon-sport/default.jpg';
     };
-    card.querySelector(".minus").onclick = () => {
-      progress[i] = Math.max(0, progress[i] - 1);
-      countEl().textContent = `${progress[i]} / ${target}`;
-    };
-    list.appendChild(card);
-  });
+
+    timeLeft = current.duration;
+    timerSecondsEl.textContent = timeLeft;
+
+    restCard.classList.add('hidden');
+    exerciseCard.classList.remove('hidden');
+
+    beep(600, 'sine', 0.2); // Signal de démarrage
+    startTimer(nextStep);
 }
 
-function endSession(aborted) {
-  clearInterval(stepInterval);
-  releaseWakeLock();
-  const durationSec = Math.round((Date.now() - sessionTimer.startedAt) / 1000);
-  if (!aborted) {
-    logSession(currentDay, durationSec);
-    mixtureReminder();
-    showBanner("Séance enregistrée 💪");
-  } else {
-    showBanner("Séance arrêtée (non enregistrée)");
-  }
-  sessionTimer = { steps: [], index: 0, remaining: 0, running: false, startedAt: null, wakeLock: null };
-  showView("program");
-  document.getElementById("programDetail").style.display = "none";
-  document.getElementById("programList").style.display = "grid";
+function runRest() {
+    isResting = true;
+    timeLeft = REST_DURATION;
+    restSecondsEl.textContent = timeLeft;
+
+    exerciseCard.classList.add('hidden');
+    restCard.classList.remove('hidden');
+
+    beep(400, 'sine', 0.3); // Signal de repos / hydratation
+    startTimer(runExercise);
 }
 
-function logSession(day, durationSec, note) {
-  state.sessions.unshift({
-    date: new Date().toDateString(),
-    dayId: day.id,
-    dayTitle: day.title,
-    durationSec,
-    note: note || "",
-  });
-  store.set("sessions", state.sessions);
-  renderJournal();
-  renderHome();
+function startTimer(onComplete) {
+    clearInterval(timer);
+    timer = setInterval(() => {
+        if (!isPaused) {
+            timeLeft--;
+            if (isResting) {
+                restSecondsEl.textContent = timeLeft;
+            } else {
+                timerSecondsEl.textContent = timeLeft;
+            }
+
+            // Décompte sonore des 3 dernières secondes
+            if (timeLeft <= 3 && timeLeft > 0) {
+                beep(800, 'square', 0.08);
+            }
+
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                onComplete();
+            }
+        }
+    }, 1000);
 }
 
-/* ============ JOURNAL ============ */
-function renderJournal() {
-  const el = document.getElementById("journalList");
-  el.innerHTML = "";
-  if (state.sessions.length === 0) {
-    el.innerHTML = `<p class="muted">Aucune séance enregistrée pour l'instant.</p>`;
-    return;
-  }
-  state.sessions.forEach((s) => {
-    const row = document.createElement("div");
-    row.className = "journal-row";
-    const mins = Math.round(s.durationSec / 60);
-    row.innerHTML = `
-      <div>
-        <div class="journal-day">${s.dayTitle}</div>
-        <div class="journal-date">${s.date}${mins ? " · " + mins + " min" : ""}</div>
-      </div>`;
-    el.appendChild(row);
-  });
+function nextStep() {
+    currentExerciseIndex++;
+    if (currentExerciseIndex < EXERCISES.length) {
+        runRest();
+    } else {
+        finishWorkout();
+    }
 }
 
-/* ============ NUTRITION ============ */
-function renderNutrition() {
-  const p = document.getElementById("nutriPrincipes");
-  p.innerHTML = NUTRITION.principes.map(t => `<li>${t}</li>`).join("");
+function finishWorkout() {
+    clearInterval(timer);
+    saveWorkoutCompletion();
+    beep(1000, 'sine', 0.5);
+    
+    alert("Bravo ! Séance terminée avec succès ! 🎉");
+    
+    if (wakeLock) {
+        wakeLock.release().then(() => wakeLock = null);
+    }
 
-  const j = document.getElementById("nutriJournee");
-  j.innerHTML = NUTRITION.journee.map(m => `
-    <div class="nutri-row"><strong>${m.moment}</strong><span>${m.detail}</span></div>`).join("");
-
-  const a = document.getElementById("nutriAliments");
-  a.innerHTML = NUTRITION.aliments.map(x => `
-    <div class="nutri-row"><strong>${x.cat}</strong><span>${x.ex}</span></div>`).join("");
+    exerciseCard.classList.remove('active');
+    exerciseCard.classList.add('hidden');
+    restCard.classList.add('hidden');
+    setupCard.classList.remove('hidden');
 }
 
-/* ============ INIT ============ */
-window.addEventListener("load", () => {
-  document.getElementById("waterIntervalSelect").value = state.settings.waterIntervalMin;
-  document.getElementById("waterIntervalSelect").onchange = (e) => {
-    state.settings.waterIntervalMin = Number(e.target.value);
-    store.set("settings", state.settings);
-    state.waterNext = Date.now() + state.settings.waterIntervalMin * 60 * 1000;
-    store.set("waterNext", state.waterNext);
-    renderWaterCountdown();
-  };
-  document.getElementById("enableNotifBtn").onclick = askNotifPermission;
+// --- Événements ---
+startBtn.addEventListener('click', startWorkout);
 
-  renderHome();
-  renderProgramList();
-  renderJournal();
-  renderNutrition();
-  scheduleWater();
-  showView("home");
+pauseBtn.addEventListener('click', () => {
+    isPaused = !isPaused;
+    pauseBtn.textContent = isPaused ? "Reprendre" : "Pause";
+});
 
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  }
+skipBtn.addEventListener('click', () => {
+    clearInterval(timer);
+    nextStep();
+});
+
+// Initialisation au chargement de la page
+document.addEventListener('DOMContentLoaded', () => {
+    updateStreakDisplay();
+    // Enregistrement du Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker enregistré.'))
+            .catch(err => console.error('Erreur Service Worker:', err));
+    }
 });

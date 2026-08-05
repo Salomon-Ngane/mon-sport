@@ -1,65 +1,293 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mon Sport - Coaching & Fit</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#2563eb">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Programme d'Entraînement</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --tag-bg: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+    }
+
+    /* Grille d'exercices */
+    .exercise-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    /* Carte d'exercice */
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-image-wrapper {
+      width: 100%;
+      height: 220px;
+      background-color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .card-image-wrapper img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .card-content {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .card-tag {
+      align-self: flex-start;
+      background-color: var(--tag-bg);
+      color: #60a5fa;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-target {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-btn {
+      margin-top: auto;
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .card-btn:hover {
+      background-color: var(--accent-hover);
+    }
+  </style>
 </head>
 <body>
-    <div class="app-container">
-        <header>
-            <h1>Mon Sport</h1>
-            <div id="streak-counter" class="streak-badge">🔥 Série : <span id="streak-count">0</span> jours</div>
-        </header>
 
-        <main>
-            <!-- Écran de sélection/début -->
-            <section id="setup-card" class="card">
-                <h2>Séance du jour</h2>
-                <p id="workout-desc">Chargement du programme...</p>
-                <button id="start-btn" class="btn primary-btn">Démarrer l'entraînement</button>
-            </section>
+  <div class="container">
+    <header>
+      <h1>Catalogue d'Exercices</h1>
+      <p>Sélectionnez vos mouvements pour composer votre séance</p>
+    </header>
 
-            <!-- Écran d'exercice actif -->
-            <section id="exercise-card" class="card hidden">
-                <div class="exercise-header">
-                    <span id="exercise-step">Exercice 1/5</span>
-                    <h2 id="exercise-name">Squats</h2>
-                </div>
+    <div class="exercise-grid">
 
-                <!-- Visuel d'illustration de l'exercice -->
-                <div class="media-container">
-                    <img id="exercise-image" src="mon-sport/default.jpg" alt="Illustration de l'exercice" loading="lazy">
-                </div>
+      <!-- Exercice 1 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_7.png" alt="Élévations latérales">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Haut du corps</span>
+          <h3 class="card-title">Élévations latérales</h3>
+          <p class="card-target">Cible : Épaules (faisceau latéral)</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
 
-                <div class="timer-display">
-                    <span id="timer-seconds">45</span><span class="unit">s</span>
-                </div>
+      <!-- Exercice 2 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_11.png" alt="Développé militaire">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Haut du corps</span>
+          <h3 class="card-title">Développé militaire</h3>
+          <p class="card-target">Cible : Épaules & Triceps</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
 
-                <div class="controls">
-                    <button id="pause-btn" class="btn secondary-btn">Pause</button>
-                    <button id="skip-btn" class="btn tertiary-btn">Suivant</button>
-                </div>
-            </section>
+      <!-- Exercice 3 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_13.png" alt="Rowing haltères">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Haut du corps</span>
+          <h3 class="card-title">Rowing buste penché</h3>
+          <p class="card-target">Cible : Grand dos & Biceps</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
 
-            <!-- Écran de récupération / Hydratation -->
-            <section id="rest-card" class="card hidden">
-                <h2>Temps de repos</h2>
-                <div class="timer-display rest">
-                    <span id="rest-seconds">30</span><span class="unit">s</span>
-                </div>
-                <div class="hydration-reminder">
-                    💧 <strong>Hydratation :</strong> Buvez une gorgée d'eau !
-                </div>
-            </section>
-        </main>
+      <!-- Exercice 4 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_8.png" alt="Soulevé de terre romain">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Bas du corps</span>
+          <h3 class="card-title">Soulevé de terre romain</h3>
+          <p class="card-target">Cible : Ischio-jambiers & Fessiers</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
+
+      <!-- Exercice 5 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_12.png" alt="Pont fessier">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Bas du corps</span>
+          <h3 class="card-title">Pont fessier (Glute Bridge)</h3>
+          <p class="card-target">Cible : Fessiers</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
+
+      <!-- Exercice 6 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_14.png" alt="Fentes statiques">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Bas du corps</span>
+          <h3 class="card-title">Fentes statiques</h3>
+          <p class="card-target">Cible : Quadriceps & Fessiers</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
+
+      <!-- Exercice 7 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_15.png" alt="Fentes déficitaires">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Bas du corps</span>
+          <h3 class="card-title">Fentes avec déficie (Marche)</h3>
+          <p class="card-target">Cible : Fessiers & Stabilité</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
+
+      <!-- Exercice 8 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_21.png" alt="Extension des mollets">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Bas du corps</span>
+          <h3 class="card-title">Extension des mollets</h3>
+          <p class="card-target">Cible : Mollets (Gastrocnémiens)</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
+
+      <!-- Exercice 9 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_9.png" alt="Mountain Climbers">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Cardio & Core</span>
+          <h3 class="card-title">Mountain Climbers</h3>
+          <p class="card-target">Cible : Abdominaux & Endurance</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
+
+      <!-- Exercice 10 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_10.png" alt="Fentes sautées">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Cardio & Core</span>
+          <h3 class="card-title">Fentes sautées</h3>
+          <p class="card-target">Cible : Explosivité & Quadriceps</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
+
+      <!-- Exercice 11 -->
+      <div class="card">
+        <div class="card-image-wrapper">
+          <img src="image_20.png" alt="Burpees">
+        </div>
+        <div class="card-content">
+          <span class="card-tag">Cardio & Core</span>
+          <h3 class="card-title">Burpees</h3>
+          <p class="card-target">Cible : Total Body / Cardio</p>
+          <button class="card-btn">Ajouter à la séance</button>
+        </div>
+      </div>
+
     </div>
+  </div>
 
-    <script src="app.js"></script>
 </body>
-</html>
-
 </html>
